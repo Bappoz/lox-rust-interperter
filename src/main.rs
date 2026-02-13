@@ -1,48 +1,42 @@
+mod error;
 mod scanner;
+mod token;
+
 use crate::scanner::*;
 
-use std::{env, fs};
+use crate::error::LoxError;
+use std::fs::read_to_string;
 use std::process::exit;
-use log::info;
-use std::io::{self, BufRead, Write};
-
+use std::env;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() > 2 {
-        println!("Usage: jlox [script]");
-        exit(64);
-    } else if args.len() == 2 {
-        match run_file(&args[1]){
-            Ok(_) => exit(0),
-            Err(msg) => {
-                println!("Error: {}", msg);
-                exit(1);
-            }
-        }
-    } else {
-        match run_prompt() {
-            Ok(_) => exit(0),
-            Err(msg) => {
-                println!("Error: {}", msg);
-                exit(1);
-            }
+    match args.len() {
+        1 => run_prompt(),
+        2 => run_file(&args[1]),
+        _ => {
+            eprintln!("Usage: jlox [script]");
+            exit(64);
         }
     }
 }
 
-fn run_file(path: &str) -> Result<(), String> {
-    info!("Running file inside func");
-    match fs::read_to_string(path) {
-        Err(msg) => Err(msg.to_string()),
-        Ok(bytes) => run(&bytes)
+fn run_file(path: &str) {
+    let source = read_to_string(path).expect("Could not read file");
+
+    if let Err(err) = self::run(&source) {
+        eprintln!("[line {}] Error: {}", err.line, err.message);
+        exit(65)
     }
 }
 
-fn run(bytes: &str) -> Result<(), String> {
-    let scanner = Scanner::new(&bytes);
-    let tokens = scanner.scan_tokens()?;
+fn run(bytes: &str) -> Result<(), LoxError> {
+    let mut scanner = Scanner::new(bytes);
+    let tokens = match scanner.scan_tokens() {
+        Ok(value) => value,
+        Err(err) => return Err(LoxError::new(0, err)),
+    };
 
     for token in tokens {
         println!("{:?}", token);
@@ -50,32 +44,23 @@ fn run(bytes: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn run_prompt() -> Result<(), String> {
+fn run_prompt() {
+    use std::io::{self, BufRead, Write};
+    let input = io::stdin();
     loop {
-        match io::stdout().flush() {
-            Ok(_) => {},
-            Err(_) => return Err("Could not flush the stdout".to_string()),
-        }
+        print!("> ");
+        io::stdout().flush().unwrap();
 
         let mut buf = String::new();
-
-        let input = io::stdin();
         let mut handle = input.lock();
 
-        match handle.read_line(&mut buf) {
-            Ok(n) => {
-                if n <= 1 {
-                    return Ok(())
-                }
-            },
-            Err(_) => return Err("Could not read line".to_string())
+        if handle.read_line(&mut buf).is_err() {
+            break;
         }
-        println!("> You wrote: {}", buf);
+        println!("ECHO: {}", buf);
 
-        match run(&buf) {
-            Ok(_) => {}
-            Err(msg) => println!("Error: {}", msg)
+        if let Err(err) = self::run(&buf) {
+            eprintln!("[line {}] Error: {}", err.line, err.message);
         }
     }
 }
-
