@@ -1,5 +1,6 @@
-#![allow(unused_variables)]
-#[derive(Debug, Clone)]
+#![allow(unused_variables, dead_code)]
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     // Single-character tokens
     LeftParen,
@@ -91,4 +92,3 @@ impl Token {
         format!("{} {} {:?}", self.token_type, self.lexeme, self.literal)
     }
 }
-
