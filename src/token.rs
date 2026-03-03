@@ -1,6 +1,6 @@
 #![allow(unused_variables, dead_code)]
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TokenType {
     // Single-character tokens
     LeftParen,

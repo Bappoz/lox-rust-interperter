@@ -5,9 +5,9 @@ mod token;
 use crate::scanner::*;
 
 use crate::error::LoxError;
+use std::env;
 use std::fs::read_to_string;
 use std::process::exit;
-use std::env;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

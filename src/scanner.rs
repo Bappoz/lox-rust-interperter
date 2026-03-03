@@ -1,5 +1,30 @@
+#![allow(unused_variables, dead_code)]
+
+use std::collections::HashMap;
+
 use crate::token::TokenType::Eof;
 use crate::token::{Literals, Token, TokenType};
+
+fn handle_keyword() -> HashMap<&'static str, TokenType> {
+    HashMap::from([
+        ("and", TokenType::And),
+        ("class", TokenType::Class),
+        ("else", TokenType::Else),
+        ("false", TokenType::False),
+        ("for", TokenType::For),
+        ("fun", TokenType::Fun),
+        ("if", TokenType::If),
+        ("nil", TokenType::Nil),
+        ("or", TokenType::Or),
+        ("print", TokenType::Print),
+        ("return", TokenType::Return),
+        ("super", TokenType::Super),
+        ("this", TokenType::This),
+        ("true", TokenType::True),
+        ("var", TokenType::Var),
+        ("while", TokenType::While),
+    ])
+}
 
 pub struct Scanner {
     source: String,
@@ -7,6 +32,7 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
+    keywords: HashMap<&'static str, TokenType>,
 }
 
 impl Scanner {
@@ -17,6 +43,7 @@ impl Scanner {
             start: 0,
             current: 0,
             line: 1,
+            keywords: handle_keyword(),
         }
     }
 
@@ -53,7 +80,17 @@ impl Scanner {
     }
 
     fn is_digit(&self, c: char) -> bool {
-        (c as u8) >= '0' as u8 && (c as u8) <= '9' as u8
+        let uch = c as u8;
+        uch.is_ascii_digit()
+    }
+
+    fn is_alpha(&self, c: char) -> bool {
+        let uch = c as u8;
+        uch.is_ascii_alphabetic() || c == '_'
+    }
+
+    fn is_alpha_numeric(&self, c: char) -> bool {
+        self.is_alpha(c) || self.is_digit(c)
     }
 
     // CHANGE RETURN TYPE TO 'TOKEN'
@@ -121,12 +158,26 @@ impl Scanner {
 
             c => {
                 if self.is_digit(c) {
-                    match self.number() {
-                        Ok(_) => {}
-                        _ => return Err(format!("Unknown char '{}', at line {}: ", c, self.line)),
-                    }
+                    self.number()?;
+                } else if self.is_alpha(c) {
+                    self.identifier()?;
+                } else {
+                    return Err(format!("Unknown char '{}', at line {}: ", c, self.line));
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn identifier(&mut self) -> Result<(), String> {
+        while self.is_alpha_numeric(self.peek()) {
+            self.advance();
+        }
+        let text = &self.source[self.start..self.current];
+        if let Some(&token_type) = self.keywords.get(text) {
+            self.add_token(token_type);
+        } else {
+            self.add_token(TokenType::Identifier);
         }
         Ok(())
     }
@@ -224,7 +275,6 @@ impl Scanner {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]
@@ -303,5 +353,41 @@ mod tests {
             Literals::Float(val) => assert_eq!(*val, 123.456),
             _ => panic!("Incorrect literal!"),
         }
+    }
+
+    #[test]
+    fn test_identifier() {
+        let source = "this_is_a_var = 12;";
+        let mut scanner = Scanner::new(source);
+        scanner.scan_tokens().unwrap();
+
+        assert_eq!(scanner.tokens.len(), 5);
+        assert_eq!(scanner.tokens[0].token_type, TokenType::Identifier);
+        assert_eq!(scanner.tokens[1].token_type, TokenType::Eq);
+        assert_eq!(scanner.tokens[2].token_type, TokenType::Number);
+        assert_eq!(scanner.tokens[3].token_type, TokenType::Semicolon);
+        assert_eq!(scanner.tokens[4].token_type, TokenType::Eof);
+    }
+
+    #[test]
+    fn test_handle_keyword() {
+        let source = "var test_var = 22;\nwhile true {print 99};";
+        let mut scanner = Scanner::new(source);
+        scanner.scan_tokens().unwrap();
+
+        assert_eq!(scanner.tokens.len(), 13);
+        assert_eq!(scanner.tokens[0].token_type, TokenType::Var);
+        assert_eq!(scanner.tokens[1].token_type, TokenType::Identifier);
+        assert_eq!(scanner.tokens[2].token_type, TokenType::Eq);
+        assert_eq!(scanner.tokens[3].token_type, TokenType::Number);
+        assert_eq!(scanner.tokens[4].token_type, TokenType::Semicolon);
+        assert_eq!(scanner.tokens[5].token_type, TokenType::While);
+        assert_eq!(scanner.tokens[6].token_type, TokenType::True);
+        assert_eq!(scanner.tokens[7].token_type, TokenType::LeftBrace);
+        assert_eq!(scanner.tokens[8].token_type, TokenType::Print);
+        assert_eq!(scanner.tokens[9].token_type, TokenType::Number);
+        assert_eq!(scanner.tokens[10].token_type, TokenType::RightBrace);
+        assert_eq!(scanner.tokens[11].token_type, TokenType::Semicolon);
+        assert_eq!(scanner.tokens[12].token_type, TokenType::Eof);
     }
 }
